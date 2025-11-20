@@ -8,5 +8,4 @@ __pycache__/
 
 db.sqlite3
 
-frontend/node_modules/
 .DS_Store
