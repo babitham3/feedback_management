@@ -44,8 +44,6 @@ class CommentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         #runs when a new comment is created using POST request
-        feedback_id = self.request.data.get('feedback')
-        feedback = get_object_or_404(Feedback, id=feedback_id)
-        serializer.save(created_by=self.request.user,feedback=feedback)
+        serializer.save(created_by=self.request.user)
 
 
