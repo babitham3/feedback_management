@@ -1,4 +1,5 @@
 from rest_framework.permissions import BasePermission, SAFE_METHODS
+from django.contrib.auth.models import Group
 
 def user_in_group(user,group_name):
     return user.is_authenticated and user.groups.filter(name=group_name).exists()
@@ -31,4 +32,5 @@ class IsAuthorOrAdminOrModerator(BasePermission):
         if is_admin_or_moderator(user):
             return True
         
-        return getattr(obj,'created_by',None) == user.id
+        created_by_id = getattr(obj,'created_by_id',None)
+        return created_by_id == user.id
