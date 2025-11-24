@@ -6,6 +6,9 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import JoinInvite from "./pages/JoinInvite";
 import AdminRequests from "./pages/AdminRequests";
+import CreateBoard from "./pages/CreateBoard";
+import BoardInvitesPage from "./pages/BoardInvitesPage";
+import BoardMembershipRequestsPage from "./pages/BoardMembershipRequestsPage";
 import { AuthContext } from "./contexts/AuthContext";
 
 
@@ -38,6 +41,9 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/admin/requests" element={<AdminRequests />} />
+        <Route path="/boards/create" element={<CreateBoard />} />
+        <Route path="/boards/:id/invites" element={<BoardInvitesPage />} />
+<Route path="/boards/:id/requests" element={<BoardMembershipRequestsPage />} />
       </Routes>
     </div>
   );

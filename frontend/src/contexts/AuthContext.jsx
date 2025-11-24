@@ -16,6 +16,11 @@ useEffect(() => {
     api.get("/auth/me/")
       .then(res => {
         setUser(res.data);
+        // after setUser(res.data)
+        window.__DEBUG_SHOW_USER__ = res.data;
+        console.log("me() ->", res.data);
+
+        
         // after we restore user, check if there's a pending invite token
         const pending = localStorage.getItem("pending_invite_token");
         if (pending) {

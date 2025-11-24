@@ -3,25 +3,21 @@ import React, { useState, useContext } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import api from "../api/api";
 import Comments from "./Comments";
-
-const STATUS_OPTIONS = [
-  { value: "open", label: "Open" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "completed", label: "Completed" },
-];
+import { userHasRole } from "../utils/roles";
 
 export default function FeedbackItem({ feedback, onUpdated }) {
   const { user } = useContext(AuthContext);
-  // feedback: { id, title, body, status, upvotes_count }
   const [upvotes, setUpvotes] = useState(feedback.upvotes_count ?? 0);
-  const [upvoted, setUpvoted] = useState(false); // we don't get initial flag; assume false
+  const [upvoted, setUpvoted] = useState(false);
   const [loadingUpvote, setLoadingUpvote] = useState(false);
   const [showComments, setShowComments] = useState(false);
-  const [status, setStatus] = useState(feedback.status);
-  const [changingStatus, setChangingStatus] = useState(false);
-  
+  const [editing, setEditing] = useState(false);
 
-  // toggle upvote
+  const authorId = feedback.created_by?.id ?? feedback.created_by;
+
+  const canManage = user && (userHasRole(user, "Admin") || userHasRole(user, "Moderator"));
+  const isAuthor = user && (user.id === authorId);
+
   const toggleUpvote = async () => {
     if (!user) return alert("Please login to upvote");
     setLoadingUpvote(true);
@@ -34,6 +30,39 @@ export default function FeedbackItem({ feedback, onUpdated }) {
       alert(err.response?.data?.detail || "Upvote failed");
     } finally {
       setLoadingUpvote(false);
+    }
+  };
+
+  const handleEdit = async () => {
+    const newTitle = prompt("Edit title", feedback.title);
+    if (newTitle === null) return;
+    const newBody = prompt("Edit body", feedback.body);
+    if (newBody === null) return;
+    try {
+      const res = await api.patch(`/feedback/${feedback.id}/`, { title: newTitle, body: newBody });
+      onUpdated && onUpdated(res.data);
+    } catch (err) {
+      alert(err.response?.data?.detail || "Update failed");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm("Delete this feedback?")) return;
+    try {
+      await api.delete(`/feedback/${feedback.id}/`);
+      onUpdated && onUpdated({ id: feedback.id, deleted: true });
+    } catch (err) {
+      alert(err.response?.data?.detail || "Delete failed");
+    }
+  };
+
+  const handleStatusChange = async (e) => {
+    const newStatus = e.target.value;
+    try {
+      const res = await api.post(`/feedback/${feedback.id}/set_status/`, { status: newStatus });
+      onUpdated && onUpdated(res.data);
+    } catch (err) {
+      alert(err.response?.data?.detail || "Status update failed");
     }
   };
 
@@ -54,6 +83,26 @@ export default function FeedbackItem({ feedback, onUpdated }) {
           >
             {upvotes} ▲
           </button>
+
+          <div className="mt-2">
+            { (isAuthor || canManage) && (
+              <>
+                <button onClick={handleEdit} className="mr-2 text-sm text-blue-600">Edit</button>
+                <button onClick={handleDelete} className="text-sm text-red-600">Delete</button>
+              </>
+            )}
+          </div>
+
+          { canManage && (
+            <div className="mt-3">
+              <select value={feedback.status} onChange={handleStatusChange} className="text-sm border rounded px-2 py-1">
+                <option value="open">Open</option>
+                <option value="in_progress">In Progress</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+          )}
+
           <button
             className="mt-2 text-sm text-blue-600"
             onClick={() => setShowComments(s => !s)}

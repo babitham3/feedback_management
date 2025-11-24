@@ -1,55 +1,93 @@
 // src/pages/BoardDetail.jsx
 import React, { useEffect, useState, useContext } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import api from "../api/api";
 import { AuthContext } from "../contexts/AuthContext";
 import FeedbackForm from "../components/FeedbackForm";
 import FeedbackItem from "../components/FeedbackItem";
+import { userHasRole } from "../utils/roles";
+import BoardInvites from "../components/BoardInvites";
+import BoardMembershipRequests from "../components/BoardMembershipRequests";
 
 export default function BoardDetail() {
   const { id } = useParams();
   const { user } = useContext(AuthContext);
 
+  const [loading, setLoading] = useState(true);
   const [board, setBoard] = useState(null);
   const [feedbacks, setFeedbacks] = useState([]);
   const [msg, setMsg] = useState("");
   const [membershipStatus, setMembershipStatus] = useState(null);
 
   useEffect(() => {
-    api.get(`/board/${id}/`).then(res => {
-      setBoard(res.data);
-      const isMember = checkIsMember(res.data);
-      if (isMember) setMembershipStatus("member");
-    }).catch(() => setBoard(null));
+    let alive = true;
+    setLoading(true);
+    // fetch board
+    api.get(`/board/${id}/`)
+      .then(res => {
+        if (!alive) return;
+        setBoard(res.data);
+        // determine member state defensively
+        const isMember = checkIsMember(res.data);
+        if (isMember) setMembershipStatus("member");
+      })
+      .catch(() => {
+        if (!alive) return;
+        setBoard(null);
+      });
 
-    loadFeedbacks();
-  }, [id]);
+    // fetch feedbacks
+    api.get(`/feedback/?board=${id}`)
+      .then(res => {
+        if (!alive) return;
+        setFeedbacks(res.data || []);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setFeedbacks([]);
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+
+    return () => { alive = false; };
+  }, [id, user]);
 
   function checkIsMember(boardObj) {
-    if (!boardObj || !user) return false;
-    const members = boardObj.members || [];
-    return members.some(m => (typeof m === "object" ? m.id === user.id : m === user.id)) ||
-           (boardObj.created_by && boardObj.created_by.id === user.id);
+    try {
+      if (!boardObj || !user) return false;
+      const members = boardObj.members || [];
+      // members may be list of ids or objects
+      return members.some(m => {
+        if (m == null) return false;
+        if (typeof m === "object") return m.id === user.id;
+        return m === user.id;
+      }) || (boardObj.created_by && (boardObj.created_by.id === user.id || boardObj.created_by === user.id));
+    } catch (e) {
+      return false;
+    }
   }
 
   const loadFeedbacks = async () => {
     try {
       const res = await api.get(`/feedback/?board=${id}`);
-      setFeedbacks(res.data);
+      setFeedbacks(res.data || []);
     } catch (err) {
       setFeedbacks([]);
     }
   };
 
   const onFeedbackCreated = (newFeedback) => {
-    // put newest on top
-    setFeedbacks(prev => [newFeedback, ...prev]);
+    setFeedbacks(prev => [newFeedback, ...(prev || [])]);
   };
 
   const onFeedbackUpdated = (payload) => {
-    // payload might contain id/upvotes_count/upvoted
-    if (!payload || !payload.id) return;
-    setFeedbacks(prev => prev.map(f => f.id === payload.id ? { ...f, upvotes_count: payload.upvotes_count } : f));
+    if (!payload) return;
+    if (payload.deleted) {
+      setFeedbacks(prev => (prev || []).filter(f => f.id !== payload.id));
+      return;
+    }
+    setFeedbacks(prev => (prev || []).map(f => (f.id === payload.id ? { ...f, ...payload } : f)));
   };
 
   const requestMembership = async () => {
@@ -64,20 +102,55 @@ export default function BoardDetail() {
     }
   };
 
-  if (!board) return <div>Loading...</div>;
+  const handleEditBoard = async () => {
+    if (!user) return alert("Login to edit");
+    const canEdit = userHasRole(user, "Admin") || userHasRole(user, "Moderator") || (board?.created_by && (board.created_by.id === user.id || board.created_by === user.id));
+    if (!canEdit) return alert("You don't have permission to edit this board.");
+
+    const newDesc = prompt("New description", board?.description ?? "");
+    if (newDesc === null) return;
+
+    try {
+      const res = await api.patch(`/board/${board.id}/`, { description: newDesc });
+      setBoard(res.data);
+      alert("Board updated");
+    } catch (err) {
+      console.error("Edit board failed", err);
+      alert(err.response?.data?.detail || "Update failed");
+    }
+  };
+
+  const navigate = useNavigate();
+
+  if (loading) return <div>Loading...</div>;
+  if (!board) return <div className="p-4">Board not found or you don't have access.</div>;
 
   const isMember = checkIsMember(board);
+  const canCreateFeedback = isMember || (user && (userHasRole(user, "Admin") || userHasRole(user, "Moderator")));
 
   return (
     <div>
-      <h2 className="text-2xl font-semibold mb-2">{board.name}</h2>
-      <p className="mb-2">{board.description}</p>
-      <p className="text-sm mb-4">Visibility: {board.is_public ? "Public" : "Private"}</p>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-semibold mb-2">{board?.name ?? "Board"}</h2>
+        { user && (userHasRole(user,"Admin") || userHasRole(user,"Moderator") || (board.created_by && (board.created_by.id === user.id || board.created_by === user.id))) && (
+          <button onClick={handleEditBoard} className="px-2 py-1 bg-gray-200 rounded">Edit board</button>
+        )}
+    { user && (userHasRole(user,"Admin") || userHasRole(user,"Moderator") || (board.created_by && board.created_by.id === user.id)) && (
+  <div className="flex gap-2">
+    <button onClick={() => navigate(`/boards/${board.id}/invites`)} className="px-2 py-1 border rounded">Manage Invites</button>
+    <button onClick={() => navigate(`/boards/${board.id}/requests`)} className="px-2 py-1 border rounded">Requests</button>
+  </div>
+)}
+
+      </div>
+
+      <p className="mb-2">{board?.description}</p>
+      <p className="text-sm mb-4">Visibility: {board?.is_public ? "Public" : "Private"}</p>
 
       {membershipStatus === "member" && <div className="p-2 mb-3 bg-green-50 text-green-800 rounded">You are a member of this board.</div>}
       {membershipStatus === "pending" && <div className="p-2 mb-3 bg-yellow-50 text-yellow-800 rounded">Membership request pending.</div>}
 
-      {!isMember && user && board.is_public && (
+      {!isMember && user && board?.is_public && (
         <div className="mb-4">
           <label className="block mb-1 font-medium">Request membership</label>
           <textarea value={msg} onChange={e => setMsg(e.target.value)} className="w-full p-2 border rounded mb-2" rows={3} />
@@ -85,13 +158,15 @@ export default function BoardDetail() {
         </div>
       )}
 
-      {/* Show form to create feedback only if user is member (or board is public and member requirement applied) */}
-      {isMember && <FeedbackForm boardId={board.id} onCreated={onFeedbackCreated} />}
+      {!user && board?.is_public && <p className="mb-4">Login to request membership or interact with this board.</p>}
+      {!board?.is_public && !isMember && <p className="mb-4">This board is private — ask an admin to invite you.</p>}
+
+      {canCreateFeedback && <FeedbackForm boardId={board.id} onCreated={onFeedbackCreated} />}
 
       <hr className="my-4" />
 
       <h3 className="text-xl mb-3">Feedback</h3>
-      {feedbacks.length === 0 ? (
+      {(!feedbacks || feedbacks.length === 0) ? (
         <p>No feedback visible</p>
       ) : (
         feedbacks.map(f => (

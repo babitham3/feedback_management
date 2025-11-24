@@ -3,10 +3,17 @@ from django.contrib.auth.models import User,Group
 from .models import Board, BoardInvite, Feedback, Comment, BoardMembershipRequest
 
 class UserSerializer(serializers.ModelSerializer):
+    groups = serializers.SerializerMethodField()
+    is_staff = serializers.BooleanField(read_only=True)
+    is_superuser = serializers.BooleanField(read_only=True)
+
+    def get_groups(self, obj):
+        return [g.name for g in obj.groups.all()]
+    
     class Meta:
         model = User
-        fields = ['id', 'username', 'email']
-        read_only_fields = ['id', 'username', 'email']
+        fields = ['id', 'username', 'email', 'groups', 'is_staff', 'is_superuser']
+        read_only_fields = ['id', 'username', 'email', 'groups', 'is_staff', 'is_superuser']
 
 class BoardSerializer(serializers.ModelSerializer):
     created_by = UserSerializer(read_only=True) 

@@ -313,7 +313,7 @@ class BoardMembershipRequestViewSet(viewsets.ModelViewSet):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def me_view(request):
-    serializer = RegisterSerializer(request.user)
+    serializer = UserSerializer(request.user, context={'request': request})
     return Response(serializer.data)
 
 class InviteAcceptView(APIView):
