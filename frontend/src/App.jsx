@@ -9,6 +9,8 @@ import AdminRequests from "./pages/AdminRequests";
 import CreateBoard from "./pages/CreateBoard";
 import BoardInvitesPage from "./pages/BoardInvitesPage";
 import BoardMembershipRequestsPage from "./pages/BoardMembershipRequestsPage";
+import BoardTablePage from "./pages/BoardTablePage";
+import BoardKanbanPage from "./pages/BoardKanbanPage";
 import { AuthContext } from "./contexts/AuthContext";
 
 
@@ -43,7 +45,9 @@ export default function App() {
         <Route path="/admin/requests" element={<AdminRequests />} />
         <Route path="/boards/create" element={<CreateBoard />} />
         <Route path="/boards/:id/invites" element={<BoardInvitesPage />} />
-<Route path="/boards/:id/requests" element={<BoardMembershipRequestsPage />} />
+        <Route path="/boards/:id/requests" element={<BoardMembershipRequestsPage />} />
+        <Route path="/boards/:id/table" element={<BoardTablePage />} />
+        <Route path="/boards/:id/kanban" element={<BoardKanbanPage />} />
       </Routes>
     </div>
   );
