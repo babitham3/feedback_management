@@ -1,5 +1,10 @@
 from django.db import models
 from django.contrib.auth.models import User
+import secrets
+import uuid
+from django.utils import timezone
+from datetime import timedelta
+from django.db.models import F
 
 class Board(models.Model):
     """"" Container. Can be public  or private. Users can be members of multiple boards. """""
@@ -7,7 +12,7 @@ class Board(models.Model):
     description = models.TextField(blank=True)
     is_public = models.BooleanField(default=True)
 
-    
+
 
     created_by = models.ForeignKey(User,on_delete=models.CASCADE, related_name='boards_created')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -75,3 +80,43 @@ class BoardMembershipRequest(models.Model):
 
     def __str__(self):
         return f'Membership request by {self.user.username} for board {self.board.name} - {self.status}'
+    
+
+def generate_invite_token():
+    return secrets.token_urlsafe(32)
+
+class BoardInvite(models.Model):
+    board = models.ForeignKey(Board, on_delete=models.CASCADE, related_name="invites")
+    token = models.CharField(max_length=64, unique=True, db_index=True, default=generate_invite_token)
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="created_invites"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    max_uses = models.PositiveIntegerField(null=True, blank=True)  # None => unlimited
+    uses = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    note = models.TextField(blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["token"]),
+        ]
+
+    def __str__(self):
+        return f"Invite {self.token} -> {self.board.name}"
+
+    def is_valid(self):
+        if not self.is_active:
+            return False
+        if self.expires_at and timezone.now() > self.expires_at:
+            return False
+        if self.max_uses is not None and self.uses >= self.max_uses:
+            return False
+        return True
+
+    def use(self):
+        self.uses = F('uses') + 1
+        self.save(update_fields=['uses'])
+        # refresh to get actual integer value if needed
+        self.refresh_from_db(fields=['uses'])

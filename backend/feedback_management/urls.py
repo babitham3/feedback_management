@@ -17,8 +17,16 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path,include
 
+from rest_framework_simplejwt.views import TokenObtainPairView,TokenRefreshView
+from feedback.views import me_view 
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('feedback-api/v1/',include('feedback.urls')),
     path('api-auth/', include('rest_framework.urls')),
+    #JWT token auth endpoints
+    path('feedback-api/v1/auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('feedback-api/v1/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    #fetching current user details
+    path('feedback-api/v1/auth/me/', me_view, name='auth-me'),
 ]

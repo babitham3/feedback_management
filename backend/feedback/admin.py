@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Board, Feedback, Comment
+from .models import Board, Feedback, Comment, BoardInvite
 
 @admin.register(Board)
 class BoardAdmin(admin.ModelAdmin):
@@ -22,4 +22,10 @@ class CommentAdmin(admin.ModelAdmin):
     search_fields = ('body','created_by__username','feedback__title',)
     list_filter = ('created_at',)
     ordering = ('-created_at',)
-# Register your models here.
+
+@admin.register(BoardInvite)
+class BoardInviteAdmin(admin.ModelAdmin):
+    list_display = ('id','board','token','created_by','created_at','expires_at','max_uses','uses','is_active',)
+    search_fields = ('board__name','created_by__username','token',)
+    list_filter = ('is_active','created_at','expires_at',)
+    ordering = ('-created_at',)

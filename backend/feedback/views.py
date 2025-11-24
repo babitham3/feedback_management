@@ -1,18 +1,26 @@
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Q
-from rest_framework import viewsets, permissions,generics
-from rest_framework.decorators import action
+from django.contrib.auth.models import User
+from rest_framework import viewsets, permissions,generics,status
+from rest_framework.decorators import action,api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
-from .models import Board, Feedback, Comment, BoardMembershipRequest
-from .serializers import BoardSerializer, FeedbackSerializer, CommentSerializer, FeedbackStatusSerializer, RegisterSerializer, BoardMembershipRequestSerializer
+from rest_framework.views import APIView
+from .models import Board, Feedback, Comment, BoardMembershipRequest, BoardInvite
+from .serializers import UserSerializer,BoardSerializer, FeedbackSerializer, CommentSerializer, FeedbackStatusSerializer, RegisterSerializer, BoardMembershipRequestSerializer, BoardInviteSerializer
 from .permissions import (IsAdmin, IsAdminOrModerator, IsAuthorOrAdminOrModerator, is_admin_or_moderator,)
 
 class BoardViewSet(viewsets.ModelViewSet):
 
     queryset = Board.objects.select_related('created_by').prefetch_related('members')
     serializer_class = BoardSerializer
+
+    def get_serializer_class(self):
+        if getattr(self, 'action', None) == 'invites':
+            return BoardInviteSerializer
+        return BoardSerializer
 
     def get_queryset(self):
         user = self.request.user
@@ -75,8 +83,26 @@ class BoardViewSet(viewsets.ModelViewSet):
         message = request.data.get('message','')
         membership_request = BoardMembershipRequest.objects.create(board=board,user=user,message=message,status=BoardMembershipRequest.STATUS_PENDING)
         serializer = BoardMembershipRequestSerializer(membership_request,context={'request':request})
-
-
+        return Response(serializer.data,status=201,)
+    @action(detail=True,methods=['post','get'],url_path='invites')
+    def invites(self,request,pk=None):
+        user = request.user
+        board = self.get_object()
+        #Only Admin/Moderator or board creator can view/create invites
+        if not (user.is_authenticated and (is_admin_or_moderator(user) or board.created_by_id == user.id)):
+            return Response({"detail":"You do not have permission to view or create invites for this board."},status=403,)
+        
+        if request.method == 'GET':
+            invite_qs = board.invites.all()
+            serializer = BoardInviteSerializer(invite_qs,many=True,context={'request':request})
+            return Response(serializer.data)
+        
+        expires_at = request.data.get('expires_at',None)
+        max_uses = request.data.get('max_uses',None)    
+        note = request.data.get('note','')
+        invite = BoardInvite.objects.create(board=board,created_by=user,expires_at=expires_at,max_uses=max_uses if max_uses is not None else None,note=note)
+        serializer = BoardInviteSerializer(invite,context={'request':request})
+        return Response(serializer.data,status=201,)
 
 class FeedbackViewSet(viewsets.ModelViewSet):
 
@@ -283,3 +309,51 @@ class BoardMembershipRequestViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(membership_request)
         return Response(serializer.data)
+    
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def me_view(request):
+    serializer = RegisterSerializer(request.user)
+    return Response(serializer.data)
+
+class InviteAcceptView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, token):
+        try:
+            invite = BoardInvite.objects.get(token=token)
+        except BoardInvite.DoesNotExist:
+            return Response({"detail": "Invalid invite token."}, status=404)
+        if not invite.is_valid():
+            return Response({"detail": "This invite is no longer valid."}, status=400)
+        
+        board = invite.board
+        user = request.user
+
+        #Check if user is already a member
+        if board.members.filter(id=user.id).exists():
+            return Response({"detail":"You are already a member of this board."},status=400,)
+        #add member
+        board.members.add(user)
+        invite.use() #mark it as used
+
+        serializer = BoardSerializer(board,context={'request':request})
+        return Response({"detail":"You have successfully joined the board.","board":serializer.data},status=200,)
+    
+class InviteRevokeView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, token):
+        try:
+            invite = BoardInvite.objects.get(token=token)
+        except BoardInvite.DoesNotExist:
+            return Response({"detail": "Invalid invite token."}, status=404)
+        
+        user = request.user
+
+        if not (is_admin_or_moderator(user) or invite.created_by_id == user.id):
+            return Response({"detail":"You do not have permission to revoke this invite."},status=403,)
+
+        invite.is_active = False
+        invite.save(update_fields=['is_active'])
+        return Response({"detail":"Invite has been revoked."},status=200,)

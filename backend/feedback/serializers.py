@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User,Group
-from .models import Board, Feedback, Comment, BoardMembershipRequest
+from .models import Board, BoardInvite, Feedback, Comment, BoardMembershipRequest
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -70,3 +70,12 @@ class BoardMembershipRequestSerializer(serializers.ModelSerializer):
         model = BoardMembershipRequest
         fields = ['id','board','user','status','message','requested_at','handled_at','handled_by']
         read_only_fields = ['id','user','status','requested_at','handled_at','handled_by']
+    
+class BoardInviteSerializer(serializers.ModelSerializer):
+    created_by = UserSerializer(read_only=True)
+    board = serializers.PrimaryKeyRelatedField(queryset=Board.objects.all())
+
+    class Meta:
+        model = BoardInvite 
+        fields = ['id','board','token','created_by','created_at','expires_at','max_uses','uses','is_active','note']
+        read_only_fields = ['id','token','created_by','created_at','uses']
