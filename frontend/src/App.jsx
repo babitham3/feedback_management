@@ -4,7 +4,10 @@ import Boards from "./pages/Boards";
 import BoardDetail from "./pages/BoardDetail";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import JoinInvite from "./pages/JoinInvite";
+import AdminRequests from "./pages/AdminRequests";
 import { AuthContext } from "./contexts/AuthContext";
+
 
 export default function App() {
   const {user,logout} = useContext(AuthContext);
@@ -31,8 +34,10 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Boards />} />
         <Route path="/boards/:id" element={<BoardDetail />} />
+        <Route path="/join/:token" element={<JoinInvite />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/admin/requests" element={<AdminRequests />} />
       </Routes>
     </div>
   );

@@ -1,7 +1,7 @@
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Q
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User,Group
 from rest_framework import viewsets, permissions,generics,status
 from rest_framework.decorators import action,api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
