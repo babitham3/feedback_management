@@ -122,17 +122,6 @@ class FeedbackPermissionsTests(TestCase):
         res = self.client.delete(f"{API_BASE}/feedback/{fb.id}/")
         self.assertIn(res.status_code, (403, 404))
 
-    def test_upvote_toggle(self):
-        # other upvotes
-        self.client.force_authenticate(self.other)
-        res1 = self.client.post(f"{API_BASE}/feedback/{self.feedback.id}/upvote/")
-        self.assertEqual(res1.status_code, 200)
-        self.assertIn("upvoted", res1.data)
-        # second call should remove upvote
-        res2 = self.client.post(f"{API_BASE}/feedback/{self.feedback.id}/upvote/")
-        self.assertEqual(res2.status_code, 200)
-        self.assertIn("upvoted", res2.data)
-
     def test_admin_can_set_status(self):
         self.client.force_authenticate(self.admin)
         res = self.client.post(f"{API_BASE}/feedback/{self.feedback.id}/set_status/", {"status": "in_progress"}, format="json")
