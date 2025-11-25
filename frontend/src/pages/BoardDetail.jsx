@@ -132,19 +132,26 @@ export default function BoardDetail() {
     <div>
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold mb-2">{board?.name ?? "Board"}</h2>
-{ user && (userHasRole(user,"Admin") || userHasRole(user,"Moderator") || (board.created_by && board.created_by.id === user.id)) && (
-  <div className="flex gap-2 items-center">
-    <button onClick={handleEditBoard} className="px-2 py-1 bg-gray-200 rounded">Edit board</button>
+        { user && (userHasRole(user,"Admin") || userHasRole(user,"Moderator") || (board.created_by && board.created_by.id === user.id)) && (
+        <div className="flex gap-2 items-center">
+            <button onClick={handleEditBoard} className="px-2 py-1 bg-gray-200 rounded">Edit board</button>
 
-    {/* NEW: separate pages (Table / Kanban) */}
-    <button onClick={() => navigate(`/boards/${board.id}/table`)} className="px-2 py-1 border rounded">Open Table View</button>
-    <button onClick={() => navigate(`/boards/${board.id}/kanban`)} className="px-2 py-1 border rounded">Open Kanban View</button>
+            {/* Dashboard button visible only to Admin/Moderator */}
+            {(userHasRole(user, "Admin") || userHasRole(user, "Moderator")) && (
+              <button onClick={() => navigate('/dashboard')} className="px-2 py-1 border rounded">
+                Open Dashboard
+              </button>
+            )}
 
-    {/* existing Manage Invites / Requests buttons (if present) */}
-    <button onClick={() => navigate(`/boards/${board.id}/invites`)} className="px-2 py-1 border rounded">Manage Invites</button>
-    <button onClick={() => navigate(`/boards/${board.id}/requests`)} className="px-2 py-1 border rounded">Requests</button>
-  </div>
-)}
+            {/* NEW: separate pages (Table / Kanban) */}
+            <button onClick={() => navigate(`/boards/${board.id}/table`)} className="px-2 py-1 border rounded">Open Table View</button>
+            <button onClick={() => navigate(`/boards/${board.id}/kanban`)} className="px-2 py-1 border rounded">Open Kanban View</button>
+
+            {/* existing Manage Invites / Requests buttons (if present) */}
+            <button onClick={() => navigate(`/boards/${board.id}/invites`)} className="px-2 py-1 border rounded">Manage Invites</button>
+            <button onClick={() => navigate(`/boards/${board.id}/requests`)} className="px-2 py-1 border rounded">Requests</button>
+        </div>
+        )}
 
       </div>
 

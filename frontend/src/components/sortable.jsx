@@ -3,12 +3,19 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
 export function SortableItem({ id, children }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    // a simple visual lift while dragging
-    boxShadow: isDragging ? "0 6px 18px rgba(0,0,0,0.12)" : undefined,
+    boxShadow: isDragging ? "0 8px 24px rgba(0,0,0,0.12)" : undefined,
   };
 
   return (

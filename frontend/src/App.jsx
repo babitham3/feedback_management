@@ -11,6 +11,7 @@ import BoardInvitesPage from "./pages/BoardInvitesPage";
 import BoardMembershipRequestsPage from "./pages/BoardMembershipRequestsPage";
 import BoardTablePage from "./pages/BoardTablePage";
 import BoardKanbanPage from "./pages/BoardKanbanPage";
+import Dashboard from "./pages/DashBoard";
 import { AuthContext } from "./contexts/AuthContext";
 
 
@@ -48,6 +49,7 @@ export default function App() {
         <Route path="/boards/:id/requests" element={<BoardMembershipRequestsPage />} />
         <Route path="/boards/:id/table" element={<BoardTablePage />} />
         <Route path="/boards/:id/kanban" element={<BoardKanbanPage />} />
+        <Route path="/dashboard" element={<Dashboard />} />
       </Routes>
     </div>
   );

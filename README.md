@@ -63,4 +63,5 @@ This runs at
 http://localhost:5173
 
 ## Backend testing
-```bash python manage.py test```
+```bash 
+python manage.py test```

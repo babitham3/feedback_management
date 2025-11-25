@@ -1,16 +1,19 @@
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.db.models import Q
+from django.db.models import Q,Count
 from django.contrib.auth.models import User,Group
-from rest_framework import viewsets, permissions,generics,status
+from rest_framework import viewsets, permissions,generics,status, filters as drf_filters
 from rest_framework.decorators import action,api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.views import APIView
+from django_filters.rest_framework import DjangoFilterBackend
+
 from .models import Board, Feedback, Comment, BoardMembershipRequest, BoardInvite
 from .serializers import UserSerializer,BoardSerializer, FeedbackSerializer, CommentSerializer, FeedbackStatusSerializer, RegisterSerializer, BoardMembershipRequestSerializer, BoardInviteSerializer
 from .permissions import (IsAdmin, IsAdminOrModerator, IsAuthorOrAdminOrModerator, is_admin_or_moderator,)
+
 
 class BoardViewSet(viewsets.ModelViewSet):
 
@@ -106,9 +109,18 @@ class BoardViewSet(viewsets.ModelViewSet):
 
 class FeedbackViewSet(viewsets.ModelViewSet):
 
-    queryset = Feedback.objects.select_related('board','created_by').prefetch_related('upvotes')
+    queryset = Feedback.objects.select_related('board','created_by').prefetch_related('upvotes').annotate(upvotes_count=Count('upvotes'))
     serializer_class = FeedbackSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsAuthorOrAdminOrModerator]
+
+    serializer_class = FeedbackSerializer
+
+    # Filtering / search / ordering
+    filter_backends = [DjangoFilterBackend, drf_filters.SearchFilter, drf_filters.OrderingFilter]
+    filterset_fields = ['status', 'board']
+    search_fields = ['title', 'body']
+    ordering_fields = ['created_at', 'upvotes_count']
+    ordering = ['-created_at']
 
     def get_permissions(self):
         if self.action == 'set_status':

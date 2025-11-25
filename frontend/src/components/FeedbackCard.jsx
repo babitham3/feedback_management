@@ -7,7 +7,7 @@ export default function FeedbackCard({ item, onClick }) {
       onClick={onClick}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => { if (e.key === "Enter") onClick && onClick(); }}
+      onKeyDown={(e) => { if (e.key === "Enter" && onClick) onClick(); }}
     >
       <div className="font-semibold">{item.title}</div>
       <div className="text-sm text-gray-600 mt-1">{item.body ? item.body.slice(0, 140) : ""}</div>
