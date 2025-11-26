@@ -7,6 +7,8 @@ import FeedbackForm from "../components/FeedbackForm";
 import FeedbackItem from "../components/FeedbackItem";
 import { userHasRole } from "../utils/roles";
 import FeedbackTable from "../components/FeedbackTable";
+import BoardMembershipRequests from "../components/BoardMembershipRequests";
+import { set } from "date-fns";
 
 export default function BoardDetail() {
   const { id } = useParams();
@@ -18,24 +20,22 @@ export default function BoardDetail() {
   const [msg, setMsg] = useState("");
   const [membershipStatus, setMembershipStatus] = useState(null);
 
+  const loadBoard = async () => {
+    try{
+      const res = await api.get(`/board/${id}/`);
+      setBoard(res.data);
+      const isMember = checkIsMember(res.data);
+      setMembershipStatus(isMember ? "member" : null);
+    }catch(err){
+      setBoard(null);
+    }
+  };
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
     // fetch board
-    api.get(`/board/${id}/`)
-      .then(res => {
-        if (!alive) return;
-        setBoard(res.data);
-        // determine member state defensively
-        const isMember = checkIsMember(res.data);
-        if (isMember) setMembershipStatus("member");
-      })
-      .catch(() => {
-        if (!alive) return;
-        setBoard(null);
-      });
-
+    loadBoard();
     // fetch feedbacks
     api.get(`/feedback/?board=${id}`)
       .then(res => {
@@ -171,6 +171,19 @@ export default function BoardDetail() {
 
       {!user && board?.is_public && <p className="mb-4">Login to request membership or interact with this board.</p>}
       {!board?.is_public && !isMember && <p className="mb-4">This board is private — ask an admin to invite you.</p>}
+
+      {/* render membership requests only if user can manage */}
+      { user && (userHasRole(user,"Admin") || userHasRole(user,"Moderator") || (board.created_by && board.created_by.id === user.id)) && (
+        <BoardMembershipRequests
+          boardId={board.id}
+          boardOwnerId={board?.created_by?.id}
+          onHandled={() => {
+            // re-fetch board + feedbacks after a request is handled
+            loadBoard();
+            loadFeedbacks();
+          }}
+        />
+      )}
 
       {canCreateFeedback && <FeedbackForm boardId={board.id} onCreated={onFeedbackCreated} />}
 

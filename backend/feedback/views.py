@@ -1,6 +1,7 @@
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Q,Count
+from django.db import transaction
 from django.contrib.auth.models import User,Group
 from rest_framework import viewsets, permissions,generics,status, filters as drf_filters
 from rest_framework.decorators import action,api_view, permission_classes
@@ -268,59 +269,98 @@ class RegisterView(generics.CreateAPIView):
 
 
 class BoardMembershipRequestViewSet(viewsets.ModelViewSet):
-    queryset = BoardMembershipRequest.objects.select_related("board", "user", "handled_by")
+    queryset = BoardMembershipRequest.objects.select_related("board", "user", "handled_by").order_by('handled_at')
     serializer_class = BoardMembershipRequestSerializer
-    permission_classes = [permissions.IsAuthenticated, IsAdminOrModerator]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         qs = super().get_queryset()
+        user= self.request.user
         status_param = self.request.query_params.get("status")
-        if status_param:
-            qs = qs.filter(status=status_param)
-        return qs
+        board_param = self.request.query_params.get("board")
+
+        if board_param:
+            qs = qs.filter(board_id=board_param)
+        if is_admin_or_moderator(user):
+            return qs.filter(status=status_param) if status_param else qs
+        
+        return qs.filter(user=user)
+    
+    def perform_create(self, serializer):
+        board = serializer.validated_data['board']
+        user = self.request.user
+
+        #if member already, no need to request
+        if board.members.filter(id=user.id).exists():
+            raise PermissionDenied("You are already a member of this board.")
+        #check for existing pending request
+        existing = BoardMembershipRequest.objects.filter(board=board,user=user,status=BoardMembershipRequest.STATUS_PENDING,).first()
+        if existing:
+            raise PermissionDenied("You already have a pending membership request for this board.")
+        serializer.save(user=user,status=BoardMembershipRequest.STATUS_PENDING)
+    
+    def _is_board_owner_or_admin_mod(self, user, board):
+        return is_admin_or_moderator(user) or (board and board.created_by_id == user.id)
 
     @action(detail=True, methods=["post"], url_path="approve")
     def approve(self, request, pk=None):
         membership_request = self.get_object()
         user = request.user
+        board = membership_request.board
 
+        if not self._is_board_owner_or_admin_mod(user, board):
+            return Response(
+                {"detail": "You do not have permission to approve this request."},
+                status=403,
+            )
         if membership_request.status != BoardMembershipRequest.STATUS_PENDING:
             return Response(
                 {"detail": "Only pending requests can be approved."},
                 status=400,
             )
+        
+        with transaction.atomic():
+            membership_request.status = BoardMembershipRequest.STATUS_APPROVED
+            membership_request.handled_by = user
+            membership_request.handled_at = timezone.now()
+            membership_request.save(update_fields=['status','handled_by','handled_at'])
+            #add user to board members
+            board.members.add(membership_request.user)
 
-        # Approve
-        membership_request.status = BoardMembershipRequest.STATUS_APPROVED
-        membership_request.handled_by = user
-        membership_request.handled_at = timezone.now()
-        membership_request.save()
+            # reject any other pending requests by same user for same board
+            BoardMembershipRequest.objects.filter(
+                board=board,
+                user=membership_request.user,
+                status=BoardMembershipRequest.STATUS_PENDING
+            ).exclude(pk=membership_request.pk).update(
+                status=BoardMembershipRequest.STATUS_REJECTED,
+                handled_by=user,
+                handled_at=timezone.now()
+            )
 
-        # Add user to board members
-        board = membership_request.board
-        board.members.add(membership_request.user)
-
-        serializer = self.get_serializer(membership_request)
-        return Response(serializer.data)
+        serializer = self.get_serializer(membership_request, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"], url_path="reject")
     def reject(self, request, pk=None):
         membership_request = self.get_object()
         user = request.user
+        board = membership_request.board
+
+        if not self._is_board_owner_or_admin_mod(user, board):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
         if membership_request.status != BoardMembershipRequest.STATUS_PENDING:
-            return Response(
-                {"detail": "Only pending requests can be rejected."},
-                status=400,
-            )
+            return Response({"detail": "Only pending requests can be rejected."}, status=status.HTTP_400_BAD_REQUEST)
 
-        membership_request.status = BoardMembershipRequest.STATUS_REJECTED
-        membership_request.handled_by = user
-        membership_request.handled_at = timezone.now()
-        membership_request.save()
+        with transaction.atomic():
+            membership_request.status = BoardMembershipRequest.STATUS_REJECTED
+            membership_request.handled_by = user
+            membership_request.handled_at = timezone.now()
+            membership_request.save(update_fields=["status", "handled_by", "handled_at"])
 
-        serializer = self.get_serializer(membership_request)
-        return Response(serializer.data)
+        serializer = self.get_serializer(membership_request, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
     
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

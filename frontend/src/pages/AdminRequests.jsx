@@ -24,9 +24,10 @@ export default function AdminRequests(){
 
   const updateStatus = async (id, status) => {
     try {
-      // PATCH the request object
-      await api.patch(`/board-membership-requests/${id}/`, { status });
+      const endpoint=status==="approved" ? 'board-membership-requests/${id}/approve' : 'board-membership-requests/${id}/reject';
+      const res = await api.post(endpoint);
       setRequests(prev => prev.filter(r => r.id !== id));
+      alert(status==="approved" ? "Request approved" : "Request rejected");
     } catch (err) {
       alert(err.response?.data?.detail || "Failed");
     }

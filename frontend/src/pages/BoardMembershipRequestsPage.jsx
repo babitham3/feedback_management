@@ -30,7 +30,8 @@ export default function BoardMembershipRequestsPage() {
 
   const updateStatus = async (id, status) => {
     try {
-      await api.patch(`/board-membership-requests/${id}/`, { status });
+      const endpoint=status==="approved" ? `/board-membership-requests/${id}/approve/` : `/board-membership-requests/${id}/reject/`;
+      await api.post(endpoint);
       setRequests(prev => prev.filter(r => r.id !== id));
       alert(`Request ${status}`);
     } catch (err) {
