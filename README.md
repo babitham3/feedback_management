@@ -64,4 +64,13 @@ http://localhost:5173
 
 ## Backend testing
 ```bash 
-python manage.py test```
+python manage.py test
+```
+
+## Future possible implementations
+- A better and aesthetic UI 
+- Upvotes on comments
+- Reply threads
+- Frontend testing
+- Backend functional testing
+- Dark mode and light mode toggle
